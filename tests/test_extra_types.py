@@ -36,6 +36,27 @@ def extract_invalid_asn():
     return IOCExtractor().extract("AS4294967296").get("asn")[0]
 
 
+def test_colon_mac_is_not_also_ipv6() -> None:
+    mac = "00:1A:2B:3C:4D:5E"
+    address = "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+    bare = IOCExtractor().extract(mac)
+    assert bare.values("mac") == (mac,)
+    assert bare.get("ip6") == ()
+
+    every_type = IOCExtractor(extract_types=["all"]).extract(mac)
+    assert every_type.values("mac") == (mac,)
+    assert every_type.get("ip6") == ()
+
+    ipv6 = IOCExtractor().extract(f"{address} and 2001:db8::1 and 2001:db8::/32")
+    assert ipv6.get("mac") == ()
+    assert ipv6.values("ip6") == (address.lower(), "2001:db8::")
+    assert ipv6.values("cidr") == ("2001:db8::/32",)
+
+    both = IOCExtractor().extract(f"nic {mac} host {address}")
+    assert both.values("mac") == (mac,)
+    assert both.values("ip6") == (address.lower(),)
+
+
 def test_mac_does_not_eat_a_seventh_octet() -> None:
     assert IOCExtractor().extract("00:11:22:33:44:55:66").get("mac") == ()
     assert IOCExtractor().extract("00:11:22:33:44").get("mac") == ()

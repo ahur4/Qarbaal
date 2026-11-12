@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- A colon-separated MAC address is no longer also reported as an IPv6 address.
+- The README and installation guide describe optional extras, including
+  installing several at once, and the optional pydantic adapters.
+
 ## 0.1.0
 
 First public release of qarbaal, a local toolkit for extracting and classifying

@@ -68,6 +68,8 @@ from qarbaal.types import (
 from qarbaal.validate import confidence_for, ipv4_class, ipv6_tags, validation_notes
 
 logger = logging.getLogger("qarbaal.extract")
+# Six two-hex groups separated by colons is a MAC address, not an IPv6 token.
+_MAC_COLON_RE = re.compile(r"[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}")
 
 Validator = Callable[[Indicator], bool]
 PageSpan = tuple[int, int, int]
@@ -798,6 +800,7 @@ def _scan(
                 token.count(":") >= 2
                 and re.search(r"[a-fA-F0-9]", token)
                 and IPV6_TIME_RE.fullmatch(token) is None
+                and _MAC_COLON_RE.fullmatch(token) is None
             ):
                 lowered = token.lower()
                 tags: tuple[str, ...] = ()

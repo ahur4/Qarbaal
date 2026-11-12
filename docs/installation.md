@@ -8,29 +8,37 @@ pip install qarbaal
 
 ## Optional extras
 
-Install an extra only for the formats you read. A missing extra raises `OptionalDependencyError` with the install command. It does not affect text extraction.
+Text, JSON, CSV, XML, EML, and MBOX need no extra. Install a reader only for the formats you use. A missing extra raises `OptionalDependencyError` with the install command. It does not affect text extraction.
 
-| Extra | Packages | Use |
-| --- | --- | --- |
-| `html` | beautifulsoup4 | `.html`, `.htm` |
-| `pdf` | pymupdf | `.pdf`, including page numbers |
-| `docx` | python-docx | `.docx` |
-| `yaml` | pyyaml | `.yaml`, `.yml` |
-| `pcap` | scapy | `.pcap`, `.pcapng` |
-| `pydantic` | pydantic | dataclass results as pydantic models |
-| `all` | all of the above | every optional reader |
-| `docs` | MkDocs Material, mkdocstrings | this site |
-| `dev` | pytest, mypy, ruff | tests and type checks |
+One extra, several at once, or all of them:
 
 ```console
-pip install "qarbaal[pdf,html]"
+pip install "qarbaal[html]"
+pip install "qarbaal[html,pdf,docx]"
 pip install "qarbaal[all]"
 ```
 
-Pydantic is not required. Core results are dataclasses. When the extra is installed:
+| Input | Extra | Package |
+| --- | --- | --- |
+| Text, JSON, CSV, XML, EML, MBOX | none | standard library |
+| HTML (`.html`, `.htm`) | `html` | beautifulsoup4 |
+| PDF (`.pdf`, including page numbers) | `pdf` | pymupdf |
+| DOCX (`.docx`) | `docx` | python-docx |
+| YAML (`.yaml`, `.yml`) | `yaml` | pyyaml |
+| PCAP (`.pcap`, `.pcapng`) | `pcap` | scapy |
+
+`docs` installs MkDocs Material and mkdocstrings. `dev` installs pytest, mypy, and ruff.
+
+### Pydantic models
+
+```console
+pip install "qarbaal[pydantic]"
+```
+
+`qarbaal.adapters.to_pydantic(indicator)` and `extraction_to_pydantic(result)` return a pydantic `BaseModel` named `QarbaalIndicator`. Use it when an app or API already validates and serializes with pydantic. Core results stay plain dataclasses, so the base install keeps zero runtime dependencies. Calling either function without pydantic raises `OptionalDependencyError` with the install hint.
 
 ```python
-from qarbaal.adapters import to_pydantic
+from qarbaal.adapters import extraction_to_pydantic, to_pydantic
 ```
 
 ## From a checkout

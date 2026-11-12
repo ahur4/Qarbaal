@@ -19,17 +19,48 @@ Python 3.10 or newer.
 pip install qarbaal
 ```
 
-That install has no runtime dependencies. Optional readers are separate extras:
+That install has no runtime dependencies.
+
+## Installing optional extras
+
+Text, JSON, CSV, XML, EML, and MBOX are read with the standard library. The other readers are extras, so a text-only install does not pull them in.
+
+One extra:
 
 ```console
-pip install "qarbaal[html]"    # HTML
-pip install "qarbaal[pdf]"     # PDF
-pip install "qarbaal[docx]"    # Word
-pip install "qarbaal[yaml]"    # YAML
-pip install "qarbaal[pcap]"    # packet captures
-pip install "qarbaal[pydantic]"
+pip install "qarbaal[html]"
+```
+
+Several at once:
+
+```console
+pip install "qarbaal[html,pdf,docx]"
+```
+
+Every optional extra:
+
+```console
 pip install "qarbaal[all]"
 ```
+
+| Input | Extra |
+| --- | --- |
+| Text, JSON, CSV, XML, EML, MBOX | none |
+| HTML | `html` |
+| PDF | `pdf` |
+| DOCX | `docx` |
+| YAML | `yaml` |
+| PCAP | `pcap` |
+
+A missing extra raises `OptionalDependencyError` and names the install command.
+
+### Pydantic models
+
+```console
+pip install "qarbaal[pydantic]"
+```
+
+That extra enables `qarbaal.adapters.to_pydantic(indicator)` and `extraction_to_pydantic(result)`. Each call returns a pydantic `BaseModel` (`QarbaalIndicator`) for validation and serialization in pydantic-based apps and APIs. Core results stay plain dataclasses, so the base install keeps zero runtime dependencies. Calling either adapter without pydantic raises `OptionalDependencyError` with the install hint.
 
 ## Quickstart
 
@@ -76,7 +107,17 @@ Each indicator keeps three strings:
 | `raw` | Exact slice of the source, which may still be defanged. |
 | `normalized` | Canonical form used for the fingerprint. |
 
-It also carries noise tags, a validation result, a confidence heuristic, local enrichment, pivot links, and one sighting per occurrence (source, line, offset, and page when the file has pages).
+It also carries:
+
+- Provenance on every sighting: source label, line, character offset, and page number for PDF.
+- A SHA-256 fingerprint of the type and the normalized value. `raw`, `value`, and `normalized` are all kept.
+- Local enrichment only. Address flags, a best-effort domain split, and URL parts are computed on the machine. Nothing is sent to a network service.
+- Deduplication and cross-source correlation. `occurrences` counts sightings. `Extraction.shared()` lists indicators that appear in more than one named source.
+- Custom `PatternSpec` patterns, allow and deny globs, and custom validators.
+- Streaming through `extract_iter` for large text, with offsets preserved across chunks.
+- Noise tags, a structural confidence heuristic, and pivot links you open yourself.
+
+Exports are CSV, JSON, JSONL, a defanged list, STIX 2.1, MISP, OpenIOC, and Suricata and Snort rules for addresses, domains, and URLs.
 
 ## Command line
 
