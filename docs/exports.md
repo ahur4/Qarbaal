@@ -4,6 +4,45 @@ Exports live in `qarbaal.export`.
 
 Machine-readable formats keep live indicator values. The defanged list rewrites them for a report.
 
+## Writing a file
+
+Every exporter accepts `path` and `filename`. `path` is the directory. `filename` is the file name, without a directory. The directory is created when it does not exist. Pass a directory and omit `filename` to use the default name for that format:
+
+| Format | Default file name |
+| --- | --- |
+| CSV | `qarbaal.csv` |
+| JSON | `qarbaal.json` |
+| JSONL | `qarbaal.jsonl` |
+| Defanged list | `qarbaal.defanged.txt` |
+| STIX 2.1 | `qarbaal.stix.json` |
+| MISP | `qarbaal.misp.json` |
+| OpenIOC | `qarbaal.openioc.xml` |
+| Suricata | `qarbaal.suricata.rules` |
+| Snort | `qarbaal.snort.rules` |
+
+Omit `path` and the file is written in the current working directory. Omit both arguments and the function returns the serialized text.
+
+A call that writes a file returns an `ExportFile`:
+
+| Field | Meaning |
+| --- | --- |
+| `path` | Absolute path of the written file |
+| `filename` | File name |
+| `size` | Size in bytes |
+| `format` | Format name, such as `csv` or `stix` |
+| `count` | Indicators represented in the file. Suricata and Snort count emitted rules. A STIX bundle counts the objects in the bundle. |
+| `sha256` | SHA-256 digest of the file bytes |
+
+```python
+from qarbaal import extract, to_json
+
+result = extract("8.8.8.8 evil.example")
+written = to_json(result, path="exports", filename="iocs.json")
+print(written.path, written.size, written.count, written.sha256)
+```
+
+`ExportFile` is a pydantic model. `filename` must be a single path component. A name that contains a slash is rejected.
+
 ## CSV
 
 `to_csv` writes a UTF-8 BOM, CRLF line endings, and quotes every field. There is no trailing CRLF. The compact columns are `type`, `value`, `tags`. The detailed form adds `normalized`, `fingerprint`, `source`, `line`, `offset`, `page`, `occurrences`, `confidence`, and `valid`.

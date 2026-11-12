@@ -62,8 +62,9 @@ from qarbaal.export import to_json, to_stix
 
 extractor = IOCExtractor()
 result = extractor.extract_path("alert.eml")
-open("iocs.json", "w", encoding="utf-8").write(to_json(result, detailed=True))
-open("bundle.json", "w", encoding="utf-8").write(to_stix(result))
+to_json(result, detailed=True, path="out", filename="iocs.json")
+written = to_stix(result, path="out", filename="bundle.stix.json")
+print(written.path, written.size)
 ```
 
 Several named sources become one correlated result. `extract_many` accepts a mapping or `(name, text)` pairs. Indicators that appear in more than one source are `result.shared()`. The same calls, including streaming, custom patterns, and exports, are in [Using qarbaal in Python](python.md).

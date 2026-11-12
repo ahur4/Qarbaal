@@ -109,7 +109,7 @@ It also carries:
 - Streaming through `extract_iter` for large text, with offsets preserved across chunks.
 - Noise tags, a structural confidence heuristic, and pivot links you open yourself.
 
-Exports are CSV, JSON, JSONL, a defanged list, STIX 2.1, MISP, OpenIOC, and Suricata and Snort rules for addresses, domains, and URLs.
+Exports are CSV, JSON, JSONL, a defanged list, STIX 2.1, MISP, OpenIOC, and Suricata and Snort rules for addresses, domains, and URLs. Pass `path` and `filename` to write a file and receive an `ExportFile`.
 
 ## Using qarbaal in Python
 
@@ -286,7 +286,9 @@ Text, JSON, CSV, XML, EML, and MBOX need no extra. HTML, PDF, DOCX, YAML, and PC
 
 ### Exports
 
-Each exporter takes an `Extraction` and returns text. Live values are kept, except `to_defanged_list`, which rewrites them for a report.
+Each exporter takes an `Extraction`. Live values are kept, except `to_defanged_list`, which rewrites them for a report. With no destination, the function returns the serialized text. Pass `path` (a directory) and `filename` (a file name) to write that text to disk. The directory is created when it is missing. Omit `filename` and the name is chosen for the format (`qarbaal.csv`, `qarbaal.json`, `qarbaal.stix.json`, and so on). Omit `path` and the file is written in the current working directory.
+
+A file write returns an `ExportFile`: `path` (absolute), `filename`, `size` in bytes, `format`, `count`, and `sha256`.
 
 ```python
 from qarbaal import (
@@ -304,14 +306,17 @@ from qarbaal import (
 
 result = extract("8.8.8.8 https://evil.example/a")
 print(to_defanged_list(result))
-print(to_stix(result))
+
+written = to_stix(result, path="out", filename="bundle.stix.json")
+print(written.path, written.size, written.sha256)
+print(to_csv(result, path="out"))
 ```
 
-`to_csv`, `to_json`, `to_jsonl`, `to_misp`, `to_openioc`, `to_suricata`, and `to_snort` take the same extraction. Suricata and Snort rules are emitted only for addresses, CIDR ranges, domains, and URLs.
+`to_csv`, `to_json`, `to_jsonl`, `to_misp`, `to_openioc`, `to_suricata`, and `to_snort` take the same extraction and the same `path` and `filename` arguments. Suricata and Snort rules are emitted only for addresses, CIDR ranges, domains, and URLs. For those two formats, `count` is the number of rules. For STIX, `count` is the number of objects in the bundle.
 
 ### Pydantic
 
-`Extraction`, `Indicator`, `Sighting`, `Enrichment`, and `ExtractionStats` are pydantic models. `indicator.type` is an `IOCType` member. `model_dump()` and `model_dump(mode="json")` serialize them. `model_dump(mode="json")` writes the type as its short key, such as `"ip"`.
+`Extraction`, `Indicator`, `Sighting`, `Enrichment`, `ExtractionStats`, and `ExportFile` are pydantic models. `indicator.type` is an `IOCType` member. `model_dump()` and `model_dump(mode="json")` serialize them. `model_dump(mode="json")` writes the type as its short key, such as `"ip"`.
 
 ## Further reading
 
