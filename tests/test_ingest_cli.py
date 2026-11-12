@@ -102,6 +102,17 @@ def test_html_pdf_docx_yaml_when_installed(tmp_path) -> None:
     assert "203.0.113.9" in IOCExtractor().extract_path(docx_path).values("ip")
 
 
+def test_pcap_when_installed(tmp_path) -> None:
+    pytest.importorskip("scapy")
+    from scapy.all import DNS, DNSQR, IP, UDP, wrpcap
+
+    path = tmp_path / "query.pcap"
+    packet = IP(dst="198.51.100.10") / UDP(dport=53) / DNS(rd=1, qd=DNSQR(qname="evil.example"))
+    wrpcap(str(path), packet)
+    found = IOCExtractor().extract_path(path)
+    assert "evil.example" in found.values("domain")
+
+
 def test_pdf_when_installed(tmp_path) -> None:
     fitz = pytest.importorskip("fitz")
     pdf = fitz.open()
