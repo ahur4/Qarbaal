@@ -9,7 +9,7 @@ Hashes are scanned longest first. A SHA-256 digest is not also reported as MD5 o
 | Key | What it matches | False-positive notes |
 | --- | --- | --- |
 | `ip` | Dotted IPv4. Each octet is 0-255 with no leading zero. | `1.2.3.4.5` still yields `1.2.3.4`. Tagged addresses are kept unless you hide them. |
-| `ip6` | A bounded IPv6 token: two to seven hex groups, then a group or a colon. | A compressed address can stop at `::` when more groups follow it. `2a06:98c1:3121::7d3a` is captured as `2a06:98c1:3121::`. Clock times such as `12:34:56` are rejected. |
+| `ip6` | A bounded IPv6 token: two to seven hex groups, then a group or a colon. | A compressed address can stop at `::` when more groups follow it. `2a06:98c1:3121::7d3a` is captured as `2a06:98c1:3121::`. Clock times such as `12:34:56` are rejected. A colon MAC of exactly six two-hex groups (`00:1A:2B:3C:4D:5E`) is not an IPv6 address. |
 | `domain` | Host names. Also taken from URL hosts and the domain part of email addresses. | A trailing label that is a file extension (`exe`, `hta`, `pdf`, ...) is ignored on the standalone pass. Domains copied out of an email address are not filtered that way, so `a@b.exe` still contributes `b.exe`. Labels are checked against the bundled TLD list when validation is on. |
 | `url` | `http`, `https`, and `ftp` URLs. Trailing `.,;:!?` and `)` are stripped. | Brackets are not part of the token, so `http://[2001:db8::1]/` is not a URL. The IPv6 address can still be found on its own. |
 | `md5` | 32 hex characters, not touching other hex. | Any 32-hex token is an MD5, including a JA3 that was also labeled. |
