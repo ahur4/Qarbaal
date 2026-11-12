@@ -8,6 +8,7 @@ The core package does not import those libraries.
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import email
 import email.policy
@@ -393,6 +394,10 @@ def _pcap_text(path: Path, max_packets: int) -> str:
                     if callable(has_layer) and has_layer(dns_cls):
                         layer = packet.getlayer(dns_cls)
                         record = getattr(layer, "qd", None)
+                        # Recent Scapy versions expose qd as a list of questions.
+                        if record is not None and not isinstance(record, (bytes, str)):
+                            with contextlib.suppress(TypeError, IndexError, KeyError):
+                                record = record[0]
                         qname = getattr(record, "qname", None) if record is not None else None
                         if isinstance(qname, bytes):
                             lines.append(qname.decode("utf-8", "replace").rstrip("."))
