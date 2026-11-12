@@ -60,7 +60,7 @@ open("iocs.json", "w", encoding="utf-8").write(to_json(result, detailed=True))
 open("bundle.json", "w", encoding="utf-8").write(to_stix(result))
 ```
 
-Several files become one correlated result. Indicators that appear in more than one file are `result.shared()`.
+Several named sources become one correlated result. `extract_many` accepts a mapping or `(name, text)` pairs. Indicators that appear in more than one source are `result.shared()`. The same calls, including streaming, custom patterns, and exports, are in [Using qarbaal in Python](python.md).
 
 ```python
 merged = extractor.extract_many(

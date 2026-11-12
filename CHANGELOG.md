@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+- The README and the documentation site add a Python usage guide: extraction,
+  configuration, enrichment, correlation, streaming, custom patterns, files,
+  exports, and the optional pydantic adapters.
+
 ## 0.1.1
 
 - A colon-separated MAC address is no longer also reported as an IPv6 address.

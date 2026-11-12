@@ -17,6 +17,7 @@ nav:
   - Home: index.md
   - Installation: installation.md
   - Quickstart: quickstart.md
+  - Using qarbaal in Python: python.md
   - Indicator types: indicator-types.md
   - Defanging: defanging.md
   - Normalization: normalization.md
