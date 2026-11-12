@@ -52,6 +52,6 @@ Refanging changes the length of the text. The indicator's `raw` field is the sli
 from qarbaal import extract
 
 indicator = extract("91.92.240[.]119").get("ip")[0]
-indicator.raw    # '91.92.240[.]119'
+indicator.raw  # '91.92.240[.]119'
 indicator.value  # '91.92.240.119'
 ```

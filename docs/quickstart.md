@@ -64,8 +64,10 @@ Several files become one correlated result. Indicators that appear in more than 
 
 ```python
 merged = extractor.extract_many(
-    [("monday", open("monday.txt", encoding="utf-8").read()),
-     ("tuesday", open("tuesday.txt", encoding="utf-8").read())]
+    [
+        ("monday", open("monday.txt", encoding="utf-8").read()),
+        ("tuesday", open("tuesday.txt", encoding="utf-8").read()),
+    ]
 )
 for indicator in merged.shared():
     print(indicator.value, indicator.sources, indicator.occurrences)

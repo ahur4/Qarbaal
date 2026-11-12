@@ -43,8 +43,10 @@ A validator receives the indicator and returns `False` to reject it. The note is
 ```python
 from qarbaal import IOCExtractor
 
+
 def allow_only_public(indicator):
     return not indicator.tags
+
 
 IOCExtractor(validators=[allow_only_public], drop_invalid=True)
 ```

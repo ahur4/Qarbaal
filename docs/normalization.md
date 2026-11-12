@@ -40,8 +40,8 @@ normalize_value("url", "HTTPS://Evil.Example:443/A")
 # 'https://evil.example/A'
 
 indicator = extract("2001:0db8:0000:0000:0000:0000:0000:0001").get("ip6")[0]
-indicator.value        # the expanded form, lower case
-indicator.normalized   # '2001:db8::1'
+indicator.value  # the expanded form, lower case
+indicator.normalized  # '2001:db8::1'
 ```
 
 ## Fingerprint
