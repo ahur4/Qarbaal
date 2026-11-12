@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- Exporters accept `path` and `filename` and write the export to that file.
+  The return value is an `ExportFile` with the absolute path, file name, size,
+  format, indicator count, and SHA-256 digest. A call that omits both arguments
+  returns the serialized text.
+
 ## 0.2.0
 
 - Indicator types are `IOCType` members on each indicator and on `get`, `values`, `extract_types`, and `PatternSpec`.

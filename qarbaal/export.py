@@ -1,5 +1,8 @@
 """Exporters. STIX, MISP, and OpenIOC are built with the standard library.
 
+Pass ``path`` and ``filename`` to write the same text to a file. The call then
+returns an ``ExportFile``. Omit both and the function returns the text.
+
 YARA and Sigma are not generated. A file hash is not a YARA rule on its own,
 and a Sigma rule needs a log source and field selection that an indicator list
 does not carry. Suricata and Snort rules are emitted only for IPs, CIDR
@@ -8,12 +11,18 @@ ranges, domains, and URLs.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import uuid
 import xml.etree.ElementTree as ET
 from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import overload
 from xml.dom import minidom
+
+from pydantic import BaseModel, ConfigDict
 
 from qarbaal.refang import defang
 from qarbaal.types import OUTPUT_ORDER, Extraction, Indicator, IOCType
@@ -90,13 +99,136 @@ _OPENIOC_CONTEXT = {
 }
 IdFactory = Callable[[str], str]
 
+_DEFAULT_FILENAMES: dict[str, str] = {
+    "csv": f"{TOOL_NAME}.csv",
+    "json": f"{TOOL_NAME}.json",
+    "jsonl": f"{TOOL_NAME}.jsonl",
+    "defanged": f"{TOOL_NAME}.defanged.txt",
+    "stix": f"{TOOL_NAME}.stix.json",
+    "misp": f"{TOOL_NAME}.misp.json",
+    "openioc": f"{TOOL_NAME}.openioc.xml",
+    "suricata": f"{TOOL_NAME}.suricata.rules",
+    "snort": f"{TOOL_NAME}.snort.rules",
+}
+
+
+class ExportFile(BaseModel):
+    """A file written by an export function.
+
+    An exporter returns this model when ``path`` or ``filename`` is set. With
+    neither argument it returns the serialized text instead.
+
+    Attributes:
+        path: Absolute path of the written file.
+        filename: File name, without a directory.
+        size: File size in bytes.
+        format: Export format, such as ``csv``, ``json``, or ``stix``.
+        count: Indicators represented in the file. Suricata and Snort count
+            emitted rules. A STIX bundle counts the objects in the bundle.
+        sha256: SHA-256 hex digest of the file bytes.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    path: str
+    filename: str
+    size: int
+    format: str
+    count: int
+    sha256: str
+
+
+def _finish(
+    content: str,
+    *,
+    format_name: str,
+    count: int,
+    path: str | os.PathLike[str] | None,
+    filename: str | None,
+) -> str | ExportFile:
+    if path is None and filename is None:
+        return content
+    directory = Path.cwd() if path is None else Path(path).expanduser()
+    name = _plain_filename(filename) if filename is not None else _DEFAULT_FILENAMES[format_name]
+    directory.mkdir(parents=True, exist_ok=True)
+    destination = (directory / name).resolve()
+    payload = content.encode("utf-8")
+    destination.write_bytes(payload)
+    return ExportFile(
+        path=str(destination),
+        filename=name,
+        size=destination.stat().st_size,
+        format=format_name,
+        count=count,
+        sha256=hashlib.sha256(payload).hexdigest(),
+    )
+
+
+def _plain_filename(filename: str) -> str:
+    if (
+        not filename
+        or filename in {".", ".."}
+        or "/" in filename
+        or "\\" in filename
+        or "\x00" in filename
+        or filename != filename.strip()
+    ):
+        raise ValueError("filename must be a file name, without a directory")
+    return filename
+
+
+@overload
+def to_csv(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    detailed: bool = False,
+    path: None = None,
+    filename: None = None,
+) -> str: ...
+
+
+@overload
+def to_csv(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    detailed: bool = False,
+    path: str | os.PathLike[str],
+    filename: str | None = None,
+) -> ExportFile: ...
+
+
+@overload
+def to_csv(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    detailed: bool = False,
+    path: str | os.PathLike[str] | None = None,
+    filename: str,
+) -> ExportFile: ...
+
+
+@overload
+def to_csv(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    detailed: bool = False,
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile: ...
+
 
 def to_csv(
     result: Extraction,
     *,
     hide_private: bool = False,
     detailed: bool = False,
-) -> str:
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile:
     """Render indicators as CSV.
 
     The compact form is ``type,value,tags`` with a UTF-8 BOM, CRLF line breaks,
@@ -107,15 +239,68 @@ def to_csv(
         result: Extraction to render.
         hide_private: Drop tagged IP, IPv6, and CIDR rows.
         detailed: Add normalized value, fingerprint, provenance, and confidence.
+        path: Directory for the file. Created when missing. The current working
+            directory is used when only ``filename`` is set.
+        filename: File name to write. The default is ``qarbaal.csv``. A name
+            that contains a directory is rejected.
 
     Returns:
-        CSV text, including the leading BOM.
+        CSV text, or an ``ExportFile`` when a file is written.
     """
 
     rows: list[list[object]] = [list(_csv_header(detailed))]
     for indicator in _visible(result, hide_private):
         rows.append(_csv_row(indicator, detailed))
-    return "\ufeff" + "\r\n".join(",".join(_quote(cell) for cell in row) for row in rows)
+    content = "\ufeff" + "\r\n".join(",".join(_quote(cell) for cell in row) for row in rows)
+    return _finish(content, format_name="csv", count=len(rows) - 1, path=path, filename=filename)
+
+
+@overload
+def to_json(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    detailed: bool = False,
+    generated: datetime | None = None,
+    path: None = None,
+    filename: None = None,
+) -> str: ...
+
+
+@overload
+def to_json(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    detailed: bool = False,
+    generated: datetime | None = None,
+    path: str | os.PathLike[str],
+    filename: str | None = None,
+) -> ExportFile: ...
+
+
+@overload
+def to_json(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    detailed: bool = False,
+    generated: datetime | None = None,
+    path: str | os.PathLike[str] | None = None,
+    filename: str,
+) -> ExportFile: ...
+
+
+@overload
+def to_json(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    detailed: bool = False,
+    generated: datetime | None = None,
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile: ...
 
 
 def to_json(
@@ -124,7 +309,9 @@ def to_json(
     hide_private: bool = False,
     detailed: bool = False,
     generated: datetime | None = None,
-) -> str:
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile:
     """Render indicators as JSON.
 
     The compact document is ``{"tool", "generated", "iocs"}`` where ``iocs``
@@ -136,9 +323,13 @@ def to_json(
         hide_private: Drop tagged IP, IPv6, and CIDR values.
         detailed: Write the full indicator records.
         generated: Timestamp used for ``generated``. Defaults to the current time.
+        path: Directory for the file. Created when missing. The current working
+            directory is used when only ``filename`` is set.
+        filename: File name to write. The default is ``qarbaal.json``. A name
+            that contains a directory is rejected.
 
     Returns:
-        JSON text indented by two spaces, without a trailing newline.
+        JSON text, or an ``ExportFile`` when a file is written.
     """
 
     stamp = isoformat_z(generated)
@@ -160,48 +351,195 @@ def to_json(
         for indicator in visible:
             grouped.setdefault(indicator.type.value, []).append(indicator.value)
         payload = {"tool": TOOL_NAME, "generated": stamp, "iocs": grouped}
-    return json.dumps(payload, indent=2, ensure_ascii=False)
+    content = json.dumps(payload, indent=2, ensure_ascii=False)
+    return _finish(content, format_name="json", count=len(visible), path=path, filename=filename)
+
+
+@overload
+def to_jsonl(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    path: None = None,
+    filename: None = None,
+) -> str: ...
+
+
+@overload
+def to_jsonl(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    path: str | os.PathLike[str],
+    filename: str | None = None,
+) -> ExportFile: ...
+
+
+@overload
+def to_jsonl(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    path: str | os.PathLike[str] | None = None,
+    filename: str,
+) -> ExportFile: ...
+
+
+@overload
+def to_jsonl(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile: ...
 
 
 def to_jsonl(
     result: Extraction,
     *,
     hide_private: bool = False,
-) -> str:
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile:
     """Render one JSON object per indicator, followed by a newline.
 
     Args:
         result: Extraction to render.
         hide_private: Drop tagged IP, IPv6, and CIDR rows.
+        path: Directory for the file. Created when missing. The current working
+            directory is used when only ``filename`` is set.
+        filename: File name to write. The default is ``qarbaal.jsonl``. A name
+            that contains a directory is rejected.
 
     Returns:
-        JSONL text. An empty extraction returns an empty string.
+        JSONL text, or an ``ExportFile`` when a file is written.
     """
 
-    lines = [
-        json.dumps(indicator_to_dict(indicator), ensure_ascii=False)
-        for indicator in _visible(result, hide_private)
-    ]
-    if not lines:
-        return ""
-    return "\n".join(lines) + "\n"
+    visible = _visible(result, hide_private)
+    lines = [json.dumps(indicator_to_dict(indicator), ensure_ascii=False) for indicator in visible]
+    content = "" if not lines else "\n".join(lines) + "\n"
+    return _finish(content, format_name="jsonl", count=len(visible), path=path, filename=filename)
 
 
-def to_defanged_list(result: Extraction, *, hide_private: bool = False) -> str:
+@overload
+def to_defanged_list(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    path: None = None,
+    filename: None = None,
+) -> str: ...
+
+
+@overload
+def to_defanged_list(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    path: str | os.PathLike[str],
+    filename: str | None = None,
+) -> ExportFile: ...
+
+
+@overload
+def to_defanged_list(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    path: str | os.PathLike[str] | None = None,
+    filename: str,
+) -> ExportFile: ...
+
+
+@overload
+def to_defanged_list(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile: ...
+
+
+def to_defanged_list(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile:
     """Render one defanged indicator per line, in export order.
 
     Args:
         result: Extraction to render.
         hide_private: Drop tagged IP, IPv6, and CIDR rows.
+        path: Directory for the file. Created when missing. The current working
+            directory is used when only ``filename`` is set.
+        filename: File name to write. The default is ``qarbaal.defanged.txt``.
+            A name that contains a directory is rejected.
 
     Returns:
-        Plain text. Lines are separated by ``\\n`` with no trailing newline.
+        Plain text, or an ``ExportFile`` when a file is written.
     """
 
-    lines = [
-        defang(indicator.value, indicator.type) for indicator in _visible(result, hide_private)
-    ]
-    return "\n".join(lines)
+    visible = _visible(result, hide_private)
+    lines = [defang(indicator.value, indicator.type) for indicator in visible]
+    return _finish(
+        "\n".join(lines),
+        format_name="defanged",
+        count=len(visible),
+        path=path,
+        filename=filename,
+    )
+
+
+@overload
+def to_stix(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    generated: datetime | None = None,
+    id_factory: IdFactory | None = None,
+    path: None = None,
+    filename: None = None,
+) -> str: ...
+
+
+@overload
+def to_stix(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    generated: datetime | None = None,
+    id_factory: IdFactory | None = None,
+    path: str | os.PathLike[str],
+    filename: str | None = None,
+) -> ExportFile: ...
+
+
+@overload
+def to_stix(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    generated: datetime | None = None,
+    id_factory: IdFactory | None = None,
+    path: str | os.PathLike[str] | None = None,
+    filename: str,
+) -> ExportFile: ...
+
+
+@overload
+def to_stix(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    generated: datetime | None = None,
+    id_factory: IdFactory | None = None,
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile: ...
 
 
 def to_stix(
@@ -210,7 +548,9 @@ def to_stix(
     hide_private: bool = False,
     generated: datetime | None = None,
     id_factory: IdFactory | None = None,
-) -> str:
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile:
     """Render a STIX 2.1 bundle.
 
     IPs, domains, URLs, hashes, email addresses, registry keys, MAC addresses,
@@ -226,9 +566,13 @@ def to_stix(
         generated: Timestamp applied to every object.
         id_factory: Callable that receives ``bundle``, ``indicator``, or
             ``vulnerability`` and returns the full STIX id.
+        path: Directory for the file. Created when missing. The current working
+            directory is used when only ``filename`` is set.
+        filename: File name to write. The default is ``qarbaal.stix.json``.
+            A name that contains a directory is rejected.
 
     Returns:
-        JSON text for the bundle.
+        Bundle JSON, or an ``ExportFile`` when a file is written.
     """
 
     stamp = isoformat_z(generated)
@@ -239,7 +583,52 @@ def to_stix(
         if built is not None:
             objects.append(built)
     payload = {"type": "bundle", "id": mint("bundle"), "objects": objects}
-    return json.dumps(payload, indent=2, ensure_ascii=False)
+    content = json.dumps(payload, indent=2, ensure_ascii=False)
+    return _finish(content, format_name="stix", count=len(objects), path=path, filename=filename)
+
+
+@overload
+def to_misp(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    generated: datetime | None = None,
+    path: None = None,
+    filename: None = None,
+) -> str: ...
+
+
+@overload
+def to_misp(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    generated: datetime | None = None,
+    path: str | os.PathLike[str],
+    filename: str | None = None,
+) -> ExportFile: ...
+
+
+@overload
+def to_misp(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    generated: datetime | None = None,
+    path: str | os.PathLike[str] | None = None,
+    filename: str,
+) -> ExportFile: ...
+
+
+@overload
+def to_misp(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    generated: datetime | None = None,
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile: ...
 
 
 def to_misp(
@@ -247,16 +636,22 @@ def to_misp(
     *,
     hide_private: bool = False,
     generated: datetime | None = None,
-) -> str:
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile:
     """Render a MISP event containing one attribute per indicator.
 
     Args:
         result: Extraction to render.
         hide_private: Drop tagged IP, IPv6, and CIDR attributes.
         generated: Event date. Defaults to the current UTC day.
+        path: Directory for the file. Created when missing. The current working
+            directory is used when only ``filename`` is set.
+        filename: File name to write. The default is ``qarbaal.misp.json``.
+            A name that contains a directory is rejected.
 
     Returns:
-        MISP event JSON.
+        MISP JSON, or an ``ExportFile`` when a file is written.
     """
 
     moment = generated or datetime.now(timezone.utc)
@@ -284,7 +679,62 @@ def to_misp(
             "Attribute": attributes,
         }
     }
-    return json.dumps(payload, indent=2, ensure_ascii=False)
+    content = json.dumps(payload, indent=2, ensure_ascii=False)
+    return _finish(
+        content,
+        format_name="misp",
+        count=len(attributes),
+        path=path,
+        filename=filename,
+    )
+
+
+@overload
+def to_openioc(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    generated: datetime | None = None,
+    id_factory: IdFactory | None = None,
+    path: None = None,
+    filename: None = None,
+) -> str: ...
+
+
+@overload
+def to_openioc(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    generated: datetime | None = None,
+    id_factory: IdFactory | None = None,
+    path: str | os.PathLike[str],
+    filename: str | None = None,
+) -> ExportFile: ...
+
+
+@overload
+def to_openioc(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    generated: datetime | None = None,
+    id_factory: IdFactory | None = None,
+    path: str | os.PathLike[str] | None = None,
+    filename: str,
+) -> ExportFile: ...
+
+
+@overload
+def to_openioc(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    generated: datetime | None = None,
+    id_factory: IdFactory | None = None,
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile: ...
 
 
 def to_openioc(
@@ -293,7 +743,9 @@ def to_openioc(
     hide_private: bool = False,
     generated: datetime | None = None,
     id_factory: IdFactory | None = None,
-) -> str:
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile:
     """Render an OpenIOC 1.1 document.
 
     Args:
@@ -301,9 +753,13 @@ def to_openioc(
         hide_private: Drop tagged IP, IPv6, and CIDR items.
         generated: ``last-modified`` and ``authored_date`` timestamp.
         id_factory: Callable used for the document id and each indicator item.
+        path: Directory for the file. Created when missing. The current working
+            directory is used when only ``filename`` is set.
+        filename: File name to write. The default is ``qarbaal.openioc.xml``.
+            A name that contains a directory is rejected.
 
     Returns:
-        XML text with an XML declaration.
+        OpenIOC XML, or an ``ExportFile`` when a file is written.
     """
 
     stamp = isoformat_z(generated)
@@ -322,7 +778,8 @@ def to_openioc(
     ET.SubElement(root, "authored_date").text = stamp
     definition = ET.SubElement(root, "definition")
     group = ET.SubElement(definition, "Indicator", {"operator": "OR", "id": mint("indicator")})
-    for indicator in _visible(result, hide_private):
+    visible = _visible(result, hide_private)
+    for indicator in visible:
         document, search = _OPENIOC_CONTEXT.get(indicator.type, ("Other", indicator.type.value))
         item = ET.SubElement(
             group,
@@ -334,12 +791,68 @@ def to_openioc(
         content.text = indicator.value
     rough = ET.tostring(root, encoding="utf-8")
     parsed = minidom.parseString(rough)
-    return parsed.toprettyxml(indent="  ", encoding="utf-8").decode("utf-8").strip()
+    rendered = parsed.toprettyxml(indent="  ", encoding="utf-8").decode("utf-8").strip()
+    return _finish(
+        rendered,
+        format_name="openioc",
+        count=len(visible),
+        path=path,
+        filename=filename,
+    )
+
+
+@overload
+def to_suricata(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    sid_start: int = 1_000_001,
+    path: None = None,
+    filename: None = None,
+) -> str: ...
+
+
+@overload
+def to_suricata(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    sid_start: int = 1_000_001,
+    path: str | os.PathLike[str],
+    filename: str | None = None,
+) -> ExportFile: ...
+
+
+@overload
+def to_suricata(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    sid_start: int = 1_000_001,
+    path: str | os.PathLike[str] | None = None,
+    filename: str,
+) -> ExportFile: ...
+
+
+@overload
+def to_suricata(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    sid_start: int = 1_000_001,
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile: ...
 
 
 def to_suricata(
-    result: Extraction, *, hide_private: bool = False, sid_start: int = 1_000_001
-) -> str:
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    sid_start: int = 1_000_001,
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile:
     """Render Suricata rules for IPs, CIDR ranges, domains, and URLs.
 
     Other types are omitted. A value containing a quote, semicolon, or backslash
@@ -349,15 +862,71 @@ def to_suricata(
         result: Extraction to render.
         hide_private: Drop tagged addresses.
         sid_start: First SID. Each rule increments it by one.
+        path: Directory for the file. Created when missing. The current working
+            directory is used when only ``filename`` is set.
+        filename: File name to write. The default is ``qarbaal.suricata.rules``.
+            A name that contains a directory is rejected.
 
     Returns:
-        Rule text ending in a newline, or a comment when nothing applies.
+        Rule text, or an ``ExportFile`` when a file is written.
     """
 
-    return _rules(result, hide_private=hide_private, sid_start=sid_start, kind="suricata")
+    content, count = _rules(result, hide_private=hide_private, sid_start=sid_start, kind="suricata")
+    return _finish(content, format_name="suricata", count=count, path=path, filename=filename)
 
 
-def to_snort(result: Extraction, *, hide_private: bool = False, sid_start: int = 1_000_001) -> str:
+@overload
+def to_snort(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    sid_start: int = 1_000_001,
+    path: None = None,
+    filename: None = None,
+) -> str: ...
+
+
+@overload
+def to_snort(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    sid_start: int = 1_000_001,
+    path: str | os.PathLike[str],
+    filename: str | None = None,
+) -> ExportFile: ...
+
+
+@overload
+def to_snort(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    sid_start: int = 1_000_001,
+    path: str | os.PathLike[str] | None = None,
+    filename: str,
+) -> ExportFile: ...
+
+
+@overload
+def to_snort(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    sid_start: int = 1_000_001,
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile: ...
+
+
+def to_snort(
+    result: Extraction,
+    *,
+    hide_private: bool = False,
+    sid_start: int = 1_000_001,
+    path: str | os.PathLike[str] | None = None,
+    filename: str | None = None,
+) -> str | ExportFile:
     """Render Snort rules for IPs, CIDR ranges, domains, and URLs.
 
     Domain rules match the name in DNS traffic (UDP port 53). Suricata rules
@@ -368,12 +937,17 @@ def to_snort(result: Extraction, *, hide_private: bool = False, sid_start: int =
         result: Extraction to render.
         hide_private: Drop tagged addresses.
         sid_start: First SID.
+        path: Directory for the file. Created when missing. The current working
+            directory is used when only ``filename`` is set.
+        filename: File name to write. The default is ``qarbaal.snort.rules``.
+            A name that contains a directory is rejected.
 
     Returns:
-        Rule text ending in a newline, or a comment when nothing applies.
+        Rule text, or an ``ExportFile`` when a file is written.
     """
 
-    return _rules(result, hide_private=hide_private, sid_start=sid_start, kind="snort")
+    content, count = _rules(result, hide_private=hide_private, sid_start=sid_start, kind="snort")
+    return _finish(content, format_name="snort", count=count, path=path, filename=filename)
 
 
 def indicator_to_dict(indicator: Indicator) -> dict[str, object]:
@@ -553,7 +1127,7 @@ def _stix_escape(kind: str, value: str) -> str:
     return value
 
 
-def _rules(result: Extraction, *, hide_private: bool, sid_start: int, kind: str) -> str:
+def _rules(result: Extraction, *, hide_private: bool, sid_start: int, kind: str) -> tuple[str, int]:
     rules: list[str] = []
     sid = sid_start
     for indicator in _visible(result, hide_private):
@@ -565,8 +1139,8 @@ def _rules(result: Extraction, *, hide_private: bool, sid_start: int, kind: str)
         rules.append(rule)
         sid += 1
     if not rules:
-        return f"# {TOOL_NAME}: no network indicators to emit\n"
-    return "\n".join(rules) + "\n"
+        return f"# {TOOL_NAME}: no network indicators to emit\n", 0
+    return "\n".join(rules) + "\n", len(rules)
 
 
 def _rule_safe(value: str) -> bool:

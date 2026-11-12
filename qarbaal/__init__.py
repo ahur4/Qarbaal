@@ -14,6 +14,7 @@ from qarbaal.exceptions import (
     UnsupportedFormatError,
 )
 from qarbaal.export import (
+    ExportFile,
     to_csv,
     to_defanged_list,
     to_json,
@@ -44,6 +45,7 @@ from qarbaal.version import __version__
 __all__ = [
     "SAMPLE",
     "Enrichment",
+    "ExportFile",
     "Extraction",
     "ExtractionStats",
     "IOCExtractor",

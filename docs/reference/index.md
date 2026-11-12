@@ -10,7 +10,7 @@ These pages are generated from the package docstrings.
 | [Normalization](normalize.md) | `normalize_value` |
 | [Validation](validate.md) | address classes and confidence |
 | [Enrichment](enrich.md) | local enrichment fields |
-| [Exports](export.md) | CSV, JSON, STIX, MISP, OpenIOC, rules |
+| [Exports](export.md) | CSV, JSON, STIX, MISP, OpenIOC, rules, and `ExportFile` |
 | [Ingest](ingest.md) | file readers |
 | [Exceptions](exceptions.md) | error types |
 
