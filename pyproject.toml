@@ -1,0 +1,102 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qarbaal"
+version = "0.1.0"
+description = "Extract, normalize, validate, and export indicators of compromise from text and files."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "ahur4" }]
+keywords = [
+    "ioc",
+    "threat-intelligence",
+    "dfir",
+    "cti",
+    "stix",
+    "indicators",
+    "qarbaal",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+html = ["beautifulsoup4>=4.12"]
+pdf = ["pymupdf>=1.24"]
+docx = ["python-docx>=1.1"]
+yaml = ["pyyaml>=6.0"]
+pcap = ["scapy>=2.5"]
+pydantic = ["pydantic>=2.4"]
+all = [
+    "beautifulsoup4>=4.12",
+    "pymupdf>=1.24",
+    "python-docx>=1.1",
+    "pyyaml>=6.0",
+    "scapy>=2.5",
+    "pydantic>=2.4",
+]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.13",
+    "ruff>=0.8",
+]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.26",
+]
+
+[project.urls]
+Documentation = "https://ahur4.github.io/Qarbaal/"
+Homepage = "https://github.com/ahur4/Qarbaal"
+Source = "https://github.com/ahur4/Qarbaal"
+Repository = "https://github.com/ahur4/Qarbaal"
+Issues = "https://github.com/ahur4/Qarbaal/issues"
+Changelog = "https://github.com/ahur4/Qarbaal/blob/main/CHANGELOG.md"
+
+[project.scripts]
+qarbaal = "qarbaal.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["qarbaal*"]
+
+[tool.setuptools.package-data]
+qarbaal = ["py.typed", "data/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["qarbaal", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "C4"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["qarbaal"]
+
+[tool.ruff.lint.per-file-ignores]
+"qarbaal/ingest.py" = ["B009"]
+"qarbaal/adapters.py" = ["B009"]
+"qarbaal/patterns.py" = ["SIM905"]
+"qarbaal/sample.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+packages = ["qarbaal"]
+warn_unused_ignores = true

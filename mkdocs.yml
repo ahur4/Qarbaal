@@ -1,0 +1,125 @@
+site_name: qarbaal
+site_description: Extract, normalize, validate, and export indicators of compromise.
+site_url: https://ahur4.github.io/Qarbaal/
+site_author: ahur4
+repo_url: https://github.com/ahur4/Qarbaal
+repo_name: ahur4/Qarbaal
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 ahur4
+
+strict: true
+
+watch:
+  - qarbaal
+  - CHANGELOG.md
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Quickstart: quickstart.md
+  - Indicator types: indicator-types.md
+  - Defanging: defanging.md
+  - Normalization: normalization.md
+  - Validation: validation.md
+  - Enrichment: enrichment.md
+  - Provenance and correlation: provenance.md
+  - File formats: formats.md
+  - Exports: exports.md
+  - Streaming: streaming.md
+  - Command line: cli.md
+  - API reference:
+      - Overview: reference/index.md
+      - Extractor: reference/extractor.md
+      - Types: reference/types.md
+      - Refang: reference/refang.md
+      - Normalization: reference/normalize.md
+      - Validation: reference/validate.md
+      - Enrichment: reference/enrich.md
+      - Exports: reference/export.md
+      - Ingest: reference/ingest.md
+      - Exceptions: reference/exceptions.md
+  - Changelog: changelog.md
+
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.expand
+    - navigation.tracking
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          inventories:
+            - https://docs.python.org/3/objects.inv
+          options:
+            docstring_style: google
+            docstring_section_style: list
+            members_order: source
+            heading_level: 2
+            show_root_heading: false
+            show_root_full_path: true
+            show_source: false
+            show_bases: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_signature_annotations: true
+            separate_signature: true
+            signature_crossrefs: true
+            merge_init_into_class: true
+            inherited_members: true
+            show_if_no_docstring: true
+            summary: true
+            filters:
+              - "!^_[^_]"
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path:
+        - .
+      check_paths: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ahur4/Qarbaal
