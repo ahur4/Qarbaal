@@ -22,7 +22,7 @@ def normalize_value(kind: str, value: str) -> str:
     """Return the canonical form of one indicator value.
 
     Args:
-        kind: Type key such as ``ip``, ``domain``, or ``url``.
+        kind: An :class:`~qarbaal.types.IOCType` member, for example ``IOCType.URL``.
         value: Sieve value or raw text. Defanged text is refanged first.
 
     Returns:

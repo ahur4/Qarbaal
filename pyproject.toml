@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qarbaal"
-version = "0.1.2"
+version = "0.2.0"
 description = "Extract, normalize, validate, and export indicators of compromise from text and files."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -31,7 +31,7 @@ classifiers = [
     "Topic :: Security",
     "Typing :: Typed",
 ]
-dependencies = []
+dependencies = ["pydantic>=2.4"]
 
 [project.optional-dependencies]
 html = ["beautifulsoup4>=4.12"]
@@ -39,14 +39,12 @@ pdf = ["pymupdf>=1.24"]
 docx = ["python-docx>=1.1"]
 yaml = ["pyyaml>=6.0"]
 pcap = ["scapy>=2.5"]
-pydantic = ["pydantic>=2.4"]
 all = [
     "beautifulsoup4>=4.12",
     "pymupdf>=1.24",
     "python-docx>=1.1",
     "pyyaml>=6.0",
     "scapy>=2.5",
-    "pydantic>=2.4",
 ]
 dev = [
     "pytest>=8.0",
@@ -65,9 +63,6 @@ Source = "https://github.com/ahur4/Qarbaal"
 Repository = "https://github.com/ahur4/Qarbaal"
 Issues = "https://github.com/ahur4/Qarbaal/issues"
 Changelog = "https://github.com/ahur4/Qarbaal/blob/main/CHANGELOG.md"
-
-[project.scripts]
-qarbaal = "qarbaal.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["qarbaal*"]
@@ -91,7 +86,6 @@ known-first-party = ["qarbaal"]
 
 [tool.ruff.lint.per-file-ignores]
 "qarbaal/ingest.py" = ["B009"]
-"qarbaal/adapters.py" = ["B009"]
 "qarbaal/patterns.py" = ["SIM905"]
 "qarbaal/sample.py" = ["E501"]
 

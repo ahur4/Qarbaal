@@ -12,7 +12,7 @@ import ipaddress
 import logging
 import re
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from qarbaal.enrich import enrich
@@ -63,6 +63,7 @@ from qarbaal.types import (
     Indicator,
     IOCType,
     Sighting,
+    parse_type,
     type_key,
 )
 from qarbaal.validate import confidence_for, ipv4_class, ipv6_tags, validation_notes
@@ -234,8 +235,8 @@ def merge(extractions: Sequence[Extraction]) -> Extraction:
                 for item in indicator.sightings
                 if (item.source, item.offset, item.end_offset) not in seen
             ]
-            grouped[indicator.fingerprint] = replace(
-                current, sightings=current.sightings + tuple(extra)
+            grouped[indicator.fingerprint] = current.model_copy(
+                update={"sightings": current.sightings + tuple(extra)}
             )
     indicators = _sort_indicators(tuple(grouped[key] for key in order))
     chars = sum(item.stats.input_characters for item in extractions)
@@ -319,7 +320,7 @@ class IOCExtractor:
         self._custom = tuple(compiled)
         self._types = resolve_types(
             self.extract_types,
-            custom=tuple(spec.type_name for spec, _pattern in self._custom),
+            custom=tuple(spec.type.value for spec, _pattern in self._custom),
         )
         if self.chunk_overlap < MAX_TOKEN_LENGTH:
             logger.warning(
@@ -329,10 +330,10 @@ class IOCExtractor:
             )
 
     @property
-    def types(self) -> tuple[str, ...]:
-        """Type keys this extractor will emit, in selection order."""
+    def types(self) -> tuple[IOCType, ...]:
+        """Indicator types this extractor will emit, in selection order."""
 
-        return self._types
+        return tuple(parse_type(key) for key in self._types)
 
     def extract(
         self,
@@ -643,7 +644,7 @@ class IOCExtractor:
             draft = drafts[key]
             valid = not draft.notes if self.validate else None
             indicator = Indicator(
-                type=draft.type,
+                type=parse_type(draft.type),
                 value=draft.value,
                 normalized=draft.normalized,
                 raw=draft.raw,
@@ -663,18 +664,16 @@ class IOCExtractor:
                     name = getattr(callback, "__name__", "custom")
                     notes.append(f"rejected-by:{name}")
                 if len(notes) != len(indicator.validation_notes):
-                    indicator = replace(
-                        indicator,
-                        valid=False,
-                        validation_notes=tuple(dict.fromkeys(notes)),
-                    )
-                    indicator = replace(
-                        indicator,
-                        confidence=confidence_for(
-                            kind=indicator.type,
-                            valid=False,
-                            tags=indicator.tags,
-                        ),
+                    indicator = indicator.model_copy(
+                        update={
+                            "valid": False,
+                            "validation_notes": tuple(dict.fromkeys(notes)),
+                            "confidence": confidence_for(
+                                kind=indicator.type,
+                                valid=False,
+                                tags=indicator.tags,
+                            ),
+                        }
                     )
             indicators.append(indicator)
         return _sort_indicators(tuple(indicators))
@@ -886,7 +885,7 @@ def _scan(
             add(_Hit(IOCType.USER_AGENT.value, agent, match.start(1), match.start(1) + len(agent)))
 
     for spec, pattern in custom:
-        if spec.type_name not in enabled:
+        if spec.type.value not in enabled:
             continue
         for match in pattern.finditer(text):
             token = match.group(1) if match.lastindex else match.group(0)
@@ -898,7 +897,7 @@ def _scan(
                 token = token.upper()
             start = match.start(1) if match.lastindex else match.start()
             end = match.end(1) if match.lastindex else match.end()
-            add(_Hit(spec.type_name, token, start, end))
+            add(_Hit(spec.type.value, token, start, end))
     if limited:
         logger.warning("event=match_limit limit=%s", limit)
     return hits, limited
@@ -1022,7 +1021,7 @@ def _pack(
     counts: dict[str, int] = {}
     sightings = 0
     for indicator in indicators:
-        counts[indicator.type] = counts.get(indicator.type, 0) + 1
+        counts[indicator.type.value] = counts.get(indicator.type.value, 0) + 1
         sightings += indicator.occurrences
     stats = ExtractionStats(
         counts=counts,

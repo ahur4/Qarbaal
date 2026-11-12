@@ -1,18 +1,24 @@
-"""Indicator types, sightings, and extraction results."""
+"""Indicator types, sightings, and extraction results.
+
+Results are pydantic models. :class:`IOCType` is the type you pass and the
+type you get back.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
-from dataclasses import asdict, dataclass, field
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, PrivateAttr, computed_field
 
 
 class IOCType(str, Enum):
-    """Indicator type keys.
+    """Supported indicator types.
 
-    Values are the short keys used in exports. ``IOCType.IPV4 == "ip"``.
-    Passing a member to :class:`~qarbaal.extract.IOCExtractor` is the same
-    as passing its value.
+    Pass members, not strings: ``IOCType.IPV4``, ``IOCType.EMAIL``,
+    ``IOCType.URL``. The value of each member is the short key used in
+    exports (``IOCType.IPV4.value == "ip"``).
     """
 
     IPV4 = "ip"
@@ -112,6 +118,15 @@ TYPE_LABELS: dict[str, str] = {
 }
 
 
+def parse_type(value: str) -> IOCType:
+    """Return the enum member whose export key is ``value``."""
+
+    for member in IOCType:
+        if member.value == value:
+            return member
+    raise ValueError(f"unknown indicator type: {value}")
+
+
 def type_key(value: IOCType | str) -> str:
     """Return the canonical string key for a type name or enum member."""
 
@@ -120,8 +135,7 @@ def type_key(value: IOCType | str) -> str:
     return value.strip().lower()
 
 
-@dataclass(frozen=True, slots=True)
-class Sighting:
+class Sighting(BaseModel):
     """One place an indicator was observed.
 
     Attributes:
@@ -132,6 +146,8 @@ class Sighting:
         page: Page number for paged documents such as PDF. ``None`` otherwise.
     """
 
+    model_config = ConfigDict(frozen=True)
+
     source: str
     line: int
     offset: int
@@ -139,14 +155,15 @@ class Sighting:
     page: int | None = None
 
 
-@dataclass(frozen=True, slots=True)
-class Enrichment:
+class Enrichment(BaseModel):
     """Local facts derived from an indicator. No network calls.
 
     Fields that do not apply are ``None`` or empty. :meth:`as_dict` drops those.
     Registered-domain and subdomain splits are a best-effort heuristic. They are
     not a Public Suffix List. See the enrichment guide.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     ip_version: int | None = None
     is_private: bool | None = None
@@ -179,20 +196,17 @@ class Enrichment:
         """Return a JSON-ready mapping with empty fields removed."""
 
         payload: dict[str, object] = {}
-        for key, value in asdict(self).items():
-            if value is None or value == ():
+        for key, value in self.model_dump().items():
+            if value is None or value in ((), [], {}):
                 continue
-            if key == "query_parameters":
-                pairs = value
-                if isinstance(pairs, list):
-                    payload[key] = {str(name): list(values) for name, values in pairs}
+            if key == "query_parameters" and isinstance(value, list):
+                payload[key] = {str(name): list(values) for name, values in value}
                 continue
             payload[key] = value
         return payload
 
 
-@dataclass(frozen=True, slots=True)
-class Indicator:
+class Indicator(BaseModel):
     """One deduplicated indicator and every place it was seen.
 
     ``value`` keeps the first-seen sieve form (hashes lower case, CVE identifiers
@@ -201,7 +215,7 @@ class Indicator:
     fingerprint. Neither field overwrites the other.
 
     Attributes:
-        type: Type key, for example ``ip`` or ``domain``.
+        type: :class:`IOCType` member, for example ``IOCType.IPV4``.
         value: First-seen sieve value.
         normalized: Canonical value. Equal to ``value`` when normalization is off.
         raw: Exact slice of the original source for the first sighting.
@@ -214,7 +228,9 @@ class Indicator:
         sightings: Every observation, first seen first.
     """
 
-    type: str
+    model_config = ConfigDict(frozen=True)
+
+    type: IOCType
     value: str
     normalized: str
     raw: str
@@ -226,12 +242,14 @@ class Indicator:
     enrichment: Enrichment
     sightings: tuple[Sighting, ...]
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def occurrences(self) -> int:
         """Number of sightings, including repeats inside one source."""
 
         return len(self.sightings)
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def source(self) -> str:
         """Source label of the first sighting, or an empty string."""
@@ -240,6 +258,7 @@ class Indicator:
             return ""
         return self.sightings[0].source
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def line(self) -> int | None:
         """Line number of the first sighting."""
@@ -248,6 +267,7 @@ class Indicator:
             return None
         return self.sightings[0].line
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def offset(self) -> int | None:
         """Character offset of the first sighting."""
@@ -256,6 +276,7 @@ class Indicator:
             return None
         return self.sightings[0].offset
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def end_offset(self) -> int | None:
         """Exclusive end offset of the first sighting."""
@@ -264,6 +285,7 @@ class Indicator:
             return None
         return self.sightings[0].end_offset
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def page(self) -> int | None:
         """Page number of the first sighting, when the source has pages."""
@@ -272,6 +294,7 @@ class Indicator:
             return None
         return self.sightings[0].page
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def sources(self) -> tuple[str, ...]:
         """Distinct source labels in first-seen order."""
@@ -282,6 +305,7 @@ class Indicator:
                 seen.append(sighting.source)
         return tuple(seen)
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def pivots(self) -> tuple[tuple[str, str], ...]:
         """Enrichment links for this indicator. The links are not fetched."""
@@ -291,8 +315,7 @@ class Indicator:
         return pivots_for(self.type, self.value)
 
 
-@dataclass(frozen=True, slots=True)
-class ExtractionStats:
+class ExtractionStats(BaseModel):
     """Counts for one extraction or a merged set of extractions.
 
     Attributes:
@@ -305,6 +328,8 @@ class ExtractionStats:
         sources: Source labels included in the result.
     """
 
+    model_config = ConfigDict(frozen=True)
+
     counts: Mapping[str, int]
     total: int
     sightings: int
@@ -314,26 +339,27 @@ class ExtractionStats:
     sources: tuple[str, ...]
 
 
-@dataclass(frozen=True, slots=True)
-class Extraction:
+class Extraction(BaseModel):
     """Indicators produced by one extract call or a merge of several.
 
     Iterate the extraction to walk indicators in export order. :meth:`get`
-    returns one type. :meth:`shared` returns indicators that showed up in at
-    least two sources.
+    and :meth:`values` take an :class:`IOCType` member. :meth:`shared` returns
+    indicators that showed up in at least two sources.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     indicators: tuple[Indicator, ...]
     stats: ExtractionStats
-    _grouped: Mapping[str, tuple[Indicator, ...]] = field(init=False, repr=False, compare=False)
+    _grouped: dict[IOCType, tuple[Indicator, ...]] = PrivateAttr(default_factory=dict)
 
-    def __post_init__(self) -> None:
-        grouped: dict[str, list[Indicator]] = {}
+    def model_post_init(self, context: Any) -> None:
+        grouped: dict[IOCType, list[Indicator]] = {}
         for indicator in self.indicators:
             grouped.setdefault(indicator.type, []).append(indicator)
-        object.__setattr__(self, "_grouped", {key: tuple(value) for key, value in grouped.items()})
+        self._grouped = {key: tuple(value) for key, value in grouped.items()}
 
-    def __iter__(self) -> Iterator[Indicator]:
+    def __iter__(self) -> Iterator[Indicator]:  # type: ignore[override]
         return iter(self.indicators)
 
     def __len__(self) -> int:
@@ -345,23 +371,40 @@ class Extraction:
             f"truncated={self.stats.truncated})"
         )
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def truncated(self) -> bool:
         """Whether a size limit cut the input short."""
 
         return self.stats.truncated
 
-    def get(self, kind: IOCType | str) -> tuple[Indicator, ...]:
-        """Return indicators of one type, in first-seen order."""
+    def get(self, kind: IOCType) -> tuple[Indicator, ...]:
+        """Return indicators of one type, in first-seen order.
 
-        return self._grouped.get(type_key(kind), ())
+        Args:
+            kind: Indicator type, for example ``IOCType.IPV4``.
+        """
 
-    def values(self, kind: IOCType | str) -> tuple[str, ...]:
-        """Return the sieve values of one type, in first-seen order."""
+        return self._grouped.get(_as_type(kind), ())
+
+    def values(self, kind: IOCType) -> tuple[str, ...]:
+        """Return the sieve values of one type, in first-seen order.
+
+        Args:
+            kind: Indicator type, for example ``IOCType.DOMAIN``.
+        """
 
         return tuple(indicator.value for indicator in self.get(kind))
 
     def shared(self) -> tuple[Indicator, ...]:
         """Return indicators observed in two or more sources."""
 
-        return tuple(indicator for indicator in self.indicators if len(indicator.sources) >= 2)
+        return tuple(indicator for indicator in self.indicators if len(set(indicator.sources)) >= 2)
+
+
+def _as_type(kind: IOCType | str) -> IOCType:
+    """Accept an enum member, or the matching export key."""
+
+    if isinstance(kind, IOCType):
+        return kind
+    return parse_type(type_key(kind))

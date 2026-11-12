@@ -1,8 +1,8 @@
 # Exports
 
-Exports live in `qarbaal.export`. The command line selects the same formats with `-f`.
+Exports live in `qarbaal.export`.
 
-Machine-readable formats keep live indicator values. The defanged list is the exception, and the table honors `--defang`.
+Machine-readable formats keep live indicator values. The defanged list rewrites them for a report.
 
 ## CSV
 
@@ -61,12 +61,4 @@ YARA and Sigma generation are out of scope. A hash set is not a useful YARA rule
 
 ## Pydantic
 
-Core objects stay dataclasses. With `pip install "qarbaal[pydantic]"`:
-
-```python
-from qarbaal.adapters import extraction_to_pydantic, to_pydantic
-
-models = extraction_to_pydantic(result)
-```
-
-Without the extra, the adapter raises `OptionalDependencyError`.
+`Extraction` and `Indicator` are pydantic models. `model_dump(mode="json")` serializes an indicator, with `type` written as the short key (`"ip"`, `"domain"`, and so on).

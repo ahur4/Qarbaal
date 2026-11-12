@@ -1,6 +1,6 @@
 # Installation
 
-Python 3.10 or newer. The base package has no runtime dependencies.
+Python 3.10 or newer. The base package depends on pydantic and nothing else.
 
 ```console
 pip install qarbaal
@@ -29,17 +29,7 @@ pip install "qarbaal[all]"
 
 `docs` installs MkDocs Material and mkdocstrings. `dev` installs pytest, mypy, and ruff.
 
-### Pydantic models
-
-```console
-pip install "qarbaal[pydantic]"
-```
-
-`qarbaal.adapters.to_pydantic(indicator)` and `extraction_to_pydantic(result)` return a pydantic `BaseModel` named `QarbaalIndicator`. Use it when an app or API already validates and serializes with pydantic. Core results stay plain dataclasses, so the base install keeps zero runtime dependencies. Calling either function without pydantic raises `OptionalDependencyError` with the install hint.
-
-```python
-from qarbaal.adapters import extraction_to_pydantic, to_pydantic
-```
+Extraction results are pydantic models. `indicator.type` is an `IOCType` member.
 
 ## From a checkout
 

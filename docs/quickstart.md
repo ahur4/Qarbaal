@@ -5,7 +5,7 @@
 Defanged text is understood. Dots written as `[.]`, `(dot)`, or ` dot ` become dots before the scan. `hxxps` becomes `https`.
 
 ```python
-from qarbaal import extract
+from qarbaal import IOCType, extract
 
 report = """
 From: "IT Helpdesk" <support[at]corp-it-desk[.]com>
@@ -17,9 +17,9 @@ Unpatched: CVE-2024-21412 and T1566.001
 """
 
 result = extract(report)
-print(result.values("url"))
-print(result.values("ip"))
-print(result.get("ip")[1].tags)  # ('private',)
+print(result.values(IOCType.URL))
+print(result.values(IOCType.IPV4))
+print(result.get(IOCType.IPV4)[1].tags)  # ('private',)
 ```
 
 `SAMPLE` is a longer synthetic incident in the same style.
@@ -36,17 +36,23 @@ print(result.stats.counts)
 The default set is the high-precision types. Paths, mutexes, and User-Agent strings are opt-in because they are noisy in ordinary prose.
 
 ```python
-from qarbaal import IOCExtractor
+from qarbaal import IOCExtractor, IOCType
 
 extractor = IOCExtractor(
-    extract_types=["ipv4", "domain", "url", "hash", "email", "cve"],
+    extract_types=[
+        IOCType.IPV4,
+        IOCType.DOMAIN,
+        IOCType.URL,
+        IOCType.EMAIL,
+        IOCType.CVE,
+    ],
     hide_private=True,
     drop_invalid=True,
 )
 clean = extractor.extract(report, source="ticket-14")
 ```
 
-`hash` means MD5, SHA-1, SHA-256, and SHA-512. `all` adds the opt-in types.
+`extract_types` takes `IOCType` members. `"hash"` selects MD5, SHA-1, SHA-256, and SHA-512. `"all"` selects every type, including the opt-in ones.
 
 ## Read a file and export
 
