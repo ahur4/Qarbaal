@@ -34,12 +34,12 @@ When normalization is on, the input is rewritten with Unicode NFKC before the si
 | Path, mutex | Trimmed. |
 
 ```python
-from qarbaal import extract, normalize_value
+from qarbaal import IOCType, extract, normalize_value
 
-normalize_value("url", "HTTPS://Evil.Example:443/A")
+normalize_value(IOCType.URL, "HTTPS://Evil.Example:443/A")
 # 'https://evil.example/A'
 
-indicator = extract("2001:0db8:0000:0000:0000:0000:0000:0001").get("ip6")[0]
+indicator = extract("2001:0db8:0000:0000:0000:0000:0000:0001").get(IOCType.IPV6)[0]
 indicator.value  # the expanded form, lower case
 indicator.normalized  # '2001:db8::1'
 ```

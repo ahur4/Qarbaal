@@ -13,10 +13,10 @@ Every indicator records where it was found. The fields on the indicator itself d
 | `sources` | Distinct source labels, first-seen order. |
 
 ```python
-from qarbaal import extract
+from qarbaal import IOCType, extract
 
 text = "line one\n91.92.240[.]119\n"
-indicator = extract(text, source="note.txt").get("ip")[0]
+indicator = extract(text, source="note.txt").get(IOCType.IPV4)[0]
 indicator.line  # 2
 indicator.offset  # index of '91.92.240[.]119'
 indicator.raw  # '91.92.240[.]119'

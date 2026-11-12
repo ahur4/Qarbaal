@@ -14,27 +14,35 @@ Python 3.10 or newer.
 pip install qarbaal
 ```
 
-The base install has no runtime dependencies. HTML, PDF, Word, YAML, and packet-capture readers are optional extras. See [Installation](installation.md).
+The base install depends on pydantic. HTML, PDF, Word, YAML, and packet-capture readers are optional extras. See [Installation](installation.md).
 
 ## A first call
 
 ```python
-from qarbaal import extract
+from qarbaal import IOCType, extract
 
 result = extract("Beacon 185.220[.]101.42 and hxxps://evil[.]example/a")
 for indicator in result:
     print(indicator.type, indicator.value, indicator.line)
 ```
 
-`result` is an `Extraction`. Iterate it, or call `result.values("ip")` and `result.get("domain")`.
+`result` is a pydantic `Extraction`. Iterate it, or call `result.values(IOCType.IPV4)` and `result.get(IOCType.DOMAIN)`.
 
 The configurable processor is `IOCExtractor`. It selects types, turns normalization and validation on or off, and can merge several named sources.
 
 ```python
-from qarbaal import IOCExtractor
+from qarbaal import IOCExtractor, IOCType
 
+text = "Beacon 8.8.8.8 and https://evil.example/a"
 extractor = IOCExtractor(
-    extract_types=["ipv4", "ipv6", "domain", "url", "hash", "email", "cve"],
+    extract_types=[
+        IOCType.IPV4,
+        IOCType.IPV6,
+        IOCType.DOMAIN,
+        IOCType.URL,
+        IOCType.EMAIL,
+        IOCType.CVE,
+    ],
     normalize=True,
     validate=True,
     deduplicate=True,
@@ -56,7 +64,6 @@ result = extractor.extract(text, source="incident-42")
 - [File formats](formats.md) lists the readers.
 - [Exports](exports.md) covers CSV, JSON, STIX, MISP, OpenIOC, and rules.
 - [Streaming](streaming.md) is for large text files.
-- [Command line](cli.md) is the `qarbaal` command.
 - [API reference](reference/index.md) is generated from the docstrings.
 - [Changelog](changelog.md) records releases.
 

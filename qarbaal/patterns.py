@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from qarbaal.types import IOCType
+
 _ASCII = re.ASCII
 
 FILE_EXT: frozenset[str] = frozenset(
@@ -104,16 +106,16 @@ MAX_TOKEN_LENGTH = 4096
 
 @dataclass(frozen=True, slots=True)
 class PatternSpec:
-    """A caller-supplied indicator pattern.
+    """A caller-supplied indicator pattern for an existing :class:`~qarbaal.types.IOCType`.
 
     Attributes:
-        type_name: Type key stored on matches. It can be a built-in key or a new one.
+        type: Indicator type stored on matches.
         regex: Regular expression. Group 1 is the value when present; otherwise the whole match.
         flags: Extra :mod:`re` flags. ``re.ASCII`` is not added for you.
         folds: ``lower``, ``upper``, or ``preserve``.
     """
 
-    type_name: str
+    type: IOCType
     regex: str
     flags: int = 0
     folds: str = "preserve"
@@ -126,4 +128,4 @@ class PatternSpec:
         try:
             return re.compile(self.regex, self.flags)
         except re.error as exc:
-            raise ValueError(f"invalid custom pattern {self.type_name!r}: {exc}") from exc
+            raise ValueError(f"invalid custom pattern {self.type.value!r}: {exc}") from exc

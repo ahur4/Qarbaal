@@ -1,6 +1,6 @@
 # Indicator types
 
-The default extractor enables every type in the table below except the three marked opt-in. Pass `extract_types=["all"]` to enable those as well, or name them explicitly.
+The default extractor enables every type in the table below except the three marked opt-in. Select types with `IOCType` members, for example `IOCType.IPV4` and `IOCType.DOMAIN`. `extract_types=["all"]` or `tuple(IOCType)` enables every type, including the opt-in ones. The short keys in the table are the `IOCType` values written into JSON exports.
 
 Hashes are scanned longest first. A SHA-256 digest is not also reported as MD5 or SHA-1. Matches are deduplicated within a type. The first spelling is kept on `value`.
 

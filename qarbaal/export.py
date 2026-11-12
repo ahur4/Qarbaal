@@ -158,7 +158,7 @@ def to_json(
     else:
         grouped: dict[str, list[str]] = {}
         for indicator in visible:
-            grouped.setdefault(indicator.type, []).append(indicator.value)
+            grouped.setdefault(indicator.type.value, []).append(indicator.value)
         payload = {"tool": TOOL_NAME, "generated": stamp, "iocs": grouped}
     return json.dumps(payload, indent=2, ensure_ascii=False)
 
@@ -274,7 +274,7 @@ def to_misp(
                 "category": category,
                 "value": indicator.value,
                 "to_ids": to_ids,
-                "comment": indicator.type,
+                "comment": indicator.type.value,
             }
         )
     payload = {
@@ -323,7 +323,7 @@ def to_openioc(
     definition = ET.SubElement(root, "definition")
     group = ET.SubElement(definition, "Indicator", {"operator": "OR", "id": mint("indicator")})
     for indicator in _visible(result, hide_private):
-        document, search = _OPENIOC_CONTEXT.get(indicator.type, ("Other", indicator.type))
+        document, search = _OPENIOC_CONTEXT.get(indicator.type, ("Other", indicator.type.value))
         item = ET.SubElement(
             group,
             "IndicatorItem",
@@ -387,7 +387,7 @@ def indicator_to_dict(indicator: Indicator) -> dict[str, object]:
     """
 
     return {
-        "type": indicator.type,
+        "type": indicator.type.value,
         "value": indicator.value,
         "normalized": indicator.normalized,
         "raw": indicator.raw,
@@ -464,10 +464,10 @@ def _csv_header(detailed: bool) -> list[str]:
 def _csv_row(indicator: Indicator, detailed: bool) -> list[object]:
     tags = "|".join(indicator.tags)
     if not detailed:
-        return [indicator.type, indicator.value, tags]
+        return [indicator.type.value, indicator.value, tags]
     valid = "" if indicator.valid is None else str(indicator.valid).lower()
     return [
-        indicator.type,
+        indicator.type.value,
         indicator.value,
         indicator.normalized,
         tags,
@@ -494,8 +494,10 @@ def _counts(indicators: Sequence[Indicator]) -> dict[str, int]:
         if found:
             counts[name] = found
     for indicator in indicators:
-        if indicator.type not in counts:
-            counts[indicator.type] = sum(1 for item in indicators if item.type == indicator.type)
+        if indicator.type.value not in counts:
+            counts[indicator.type.value] = sum(
+                1 for item in indicators if item.type == indicator.type
+            )
     return counts
 
 
@@ -529,7 +531,7 @@ def _stix_object(
         "id": mint("indicator"),
         "created": stamp,
         "modified": stamp,
-        "name": f"{TOOL_NAME} {indicator.type}: {indicator.value}",
+        "name": f"{TOOL_NAME} {indicator.type.value}: {indicator.value}",
         "pattern": pattern,
         "pattern_type": "stix",
         "valid_from": stamp,
@@ -572,7 +574,7 @@ def _rule_safe(value: str) -> bool:
 
 
 def _one_rule(indicator: Indicator, sid: int, kind: str) -> str | None:
-    message = f"{TOOL_NAME} {indicator.type} {indicator.normalized}"
+    message = f"{TOOL_NAME} {indicator.type.value} {indicator.normalized}"
     if indicator.type in {IOCType.IPV4.value, IOCType.IPV6.value, IOCType.CIDR.value}:
         return (
             f"alert ip any any -> {indicator.normalized} any "

@@ -1,13 +1,13 @@
 # Using qarbaal in Python
 
-These calls use the public API. Results are dataclasses. Nothing in this page contacts a network service.
+These calls use the public API. Pass `IOCType` members such as `IOCType.IPV4` and `IOCType.URL`. `extract` returns a pydantic `Extraction`, and each indicator is a pydantic model. Nothing in this page contacts a network service.
 
 ## Quick extraction
 
 `extract` uses the default type set. Paths, mutex names, and User-Agent strings stay out until you ask for them.
 
 ```python
-from qarbaal import extract
+from qarbaal import IOCType, extract
 
 text = "Beacon 185.220.101.42 and hxxps://login[.]evil[.]example/a"
 result = extract(text)
@@ -28,8 +28,8 @@ for indicator in result.indicators:
         )
     print(indicator.enrichment)
 
-ips = result.get("ip")
-print(result.values("ip"))
+ips = result.get(IOCType.IPV4)
+print(result.values(IOCType.IPV4))
 print(
     result.stats.counts,
     result.stats.total,
@@ -40,7 +40,7 @@ print(
 
 `result` is an `Extraction`. `result.indicators` is the deduplicated tuple in export order. Iterating `result` walks that same tuple.
 
-`result.get("ip")` returns the `Indicator` objects of one type. `result.values("ip")` returns their sieve strings. `values` requires a type key. `result.stats` is an `ExtractionStats`: `counts` (unique indicators per type), `total`, `sightings`, and `input_characters`, plus `truncated`, `match_limit_hit`, and `sources`.
+`result.get(IOCType.IPV4)` returns the indicators of one type. `result.values(IOCType.IPV4)` returns their sieve strings. `indicator.type` is an `IOCType` member. `result.stats` is an `ExtractionStats`: `counts` (unique indicators per type), `total`, `sightings`, and `input_characters`, plus `truncated`, `match_limit_hit`, and `sources`. Call `model_dump()` when you want a dictionary.
 
 Each `Indicator` keeps `type`, `value` (first-seen sieve form), `raw` (the original slice, which may still be defanged), and `normalized`. `fingerprint` is the SHA-256 hex digest of the type and the normalized value. `sources` is the distinct source labels. `occurrences` is the number of sightings. Each `Sighting` has `source`, `line`, `offset`, `end_offset`, and `page` (`None` when the file has no pages). `valid` is `True`, `False`, or `None` when validation was skipped. `validation_notes` lists reason codes.
 
@@ -71,15 +71,15 @@ result = extractor.extract(text, source="ticket-14")
 Enrichment is computed locally. `as_dict()` omits empty fields.
 
 ```python
-from qarbaal import extract
+from qarbaal import IOCType, extract
 
-ip = extract("8.8.8.8").get("ip")[0]
+ip = extract("8.8.8.8").get(IOCType.IPV4)[0]
 print(ip.enrichment.as_dict())
 
-url = extract("https://login.evil.example/a").get("url")[0]
+url = extract("https://login.evil.example/a").get(IOCType.URL)[0]
 print(url.enrichment.as_dict())
 
-domain = extract("login.evil.example").get("domain")[0]
+domain = extract("login.evil.example").get(IOCType.DOMAIN)[0]
 print(domain.enrichment.as_dict())
 ```
 
@@ -130,12 +130,12 @@ Plain-text `extract_path` uses this path. Keep `chunk_overlap` at least as long 
 
 ## Custom indicator types
 
-`PatternSpec` adds a pattern. Group 1 is the value when the expression has a group. Otherwise the whole match is the value. `folds` is `lower`, `upper`, or `preserve`.
+`PatternSpec` adds a pattern for an existing `IOCType`. Group 1 is the value when the expression has a group. Otherwise the whole match is the value. `folds` is `lower`, `upper`, or `preserve`. The type's own checks still apply. A mutex pattern is included below because mutexes are opt-in, and this pattern enables that type.
 
 A validator receives the indicator and returns `False` to mark it invalid. Validation must be on, which is the default. The note is `rejected-by:` plus the function name. `drop_invalid=True` then leaves that indicator out of the result.
 
 ```python
-from qarbaal import IOCExtractor, PatternSpec
+from qarbaal import IOCExtractor, IOCType, PatternSpec
 
 
 def public_only(indicator):
@@ -144,12 +144,12 @@ def public_only(indicator):
 
 extractor = IOCExtractor(
     custom_patterns=[
-        PatternSpec(type_name="ticket", regex=r"\bCASE-\d{4}\b", folds="upper"),
+        PatternSpec(type=IOCType.MUTEX, regex=r"mutex\{([^}]+)\}"),
     ],
     validators=[public_only],
 )
-result = extractor.extract("CASE-1042 and 10.0.0.1")
-print(result.values("ticket"))
+result = extractor.extract("saw mutex{WinDefend} and 10.0.0.1")
+print(result.values(IOCType.MUTEX))
 ```
 
 ## Files
@@ -198,17 +198,4 @@ print(to_stix(result))
 
 ## Pydantic
 
-```console
-pip install "qarbaal[pydantic]"
-```
-
-```python
-from qarbaal import extract
-from qarbaal.adapters import extraction_to_pydantic, to_pydantic
-
-result = extract("8.8.8.8")
-model = to_pydantic(result.get("ip")[0])
-models = extraction_to_pydantic(result)
-```
-
-`to_pydantic` and `extraction_to_pydantic` return a pydantic `BaseModel` named `QarbaalIndicator`, for validation and serialization in an app that already uses pydantic. Core results stay dataclasses, so the base install has no runtime dependencies. Calling either function without pydantic raises `OptionalDependencyError` with the install hint.
+`Extraction`, `Indicator`, `Sighting`, `Enrichment`, and `ExtractionStats` are pydantic models. `indicator.type` is an `IOCType` member. `model_dump()` and `model_dump(mode="json")` serialize them. `model_dump(mode="json")` writes the type as its short key, such as `"ip"`.

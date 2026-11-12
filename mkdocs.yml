@@ -27,7 +27,6 @@ nav:
   - File formats: formats.md
   - Exports: exports.md
   - Streaming: streaming.md
-  - Command line: cli.md
   - API reference:
       - Overview: reference/index.md
       - Extractor: reference/extractor.md

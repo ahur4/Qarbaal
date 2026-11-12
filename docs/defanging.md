@@ -36,22 +36,22 @@ Extraction always refangs. Turning `normalize=False` skips Unicode NFKC and the 
 `defang(value, type)` replaces every dot with `[.]`. For a URL it also rewrites a leading `http` to `hxxp` and a leading `ftp` to `fxp`, so `https` becomes `hxxps`. For an email address it rewrites the first `@` as `[at]`.
 
 ```python
-from qarbaal import defang
+from qarbaal import IOCType, defang
 
-defang("https://evil.example/a.b", "url")
+defang("https://evil.example/a.b", IOCType.URL)
 # 'hxxps://evil[.]example/a[.]b'
 ```
 
-The defanged list export uses this helper. CSV, JSON, STIX, MISP, OpenIOC, and the rule exporters keep live values so the output can be matched and pivoted. The command-line `--defang` flag affects the table. The `list` format is always defanged.
+The defanged list export uses this helper. CSV, JSON, STIX, MISP, OpenIOC, and the rule exporters keep live values so the output can be matched and pivoted.
 
 ## Original text is kept
 
 Refanging changes the length of the text. The indicator's `raw` field is the slice of the original source, and `offset` points at that slice. `value` is the refanged sieve form.
 
 ```python
-from qarbaal import extract
+from qarbaal import IOCType, extract
 
-indicator = extract("91.92.240[.]119").get("ip")[0]
+indicator = extract("91.92.240[.]119").get(IOCType.IPV4)[0]
 indicator.raw  # '91.92.240[.]119'
 indicator.value  # '91.92.240.119'
 ```

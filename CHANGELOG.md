@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- Indicator types are `IOCType` members on each indicator and on `get`, `values`, `extract_types`, and `PatternSpec`.
+- Extraction results are pydantic models. pydantic is part of the base install.
+- The library is used from Python.
+
 ## 0.1.2
 
 - The README and the documentation site add a Python usage guide: extraction,
