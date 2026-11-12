@@ -46,6 +46,7 @@ result = extractor.extract(text, source="incident-42")
 
 - [Installation](installation.md) lists the extras.
 - [Quickstart](quickstart.md) walks through a report, a file, and an export.
+- [Using qarbaal in Python](python.md) is the library API: indicators, configuration, enrichment, correlation, streaming, custom patterns, files, and exports.
 - [Indicator types](indicator-types.md) is the catalog, including which types are opt-in.
 - [Defanging](defanging.md) covers the refang rules.
 - [Normalization](normalization.md) explains original versus canonical values and fingerprints.
